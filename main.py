@@ -1,5 +1,5 @@
 from typing import Annotated
-from authx import AuthXConfig, AuthX
+from authx import AuthXConfig, AuthX, RequestToken
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, Column,select
@@ -41,11 +41,19 @@ async def create_db():
     return {"ok": True}
 @app.post('/add_account',tags=["База данных"]) #создание аккаунта
 async def add_account(data: Users_Model, session: AsyncSession = Depends(get_db)):
-    new_account = accounts_db(login=data.login, password=data.password)
-    session.add(new_account)
-    await session.commit()
-    return {"msg": True}
+    try:
+        res = await session.execute(select(accounts_db).filter(accounts_db.login == data.login))
+        exist_user = res.scalars().first()
+        if exist_user:
+            raise HTTPException(400, detail="Пользователь уже существует")
 
+        new_account = accounts_db(login=data.login, password=data.password)
+        session.add(new_account)
+        await session.commit()
+        return {"msg": True}
+    except:
+        await session.rollback()
+        raise HTTPException(400, detail="Пользователь уже существует")
 
 @app.post("/auth")
 async def login(data: Users_Model,session : AsyncSession = Depends(get_db)): #роут для авторизации
@@ -57,13 +65,16 @@ async def login(data: Users_Model,session : AsyncSession = Depends(get_db)): #р
         return {"id":row.id,"login":row.login,"token": token}
     else:
         raise HTTPException(401, detail="invalid credentials")
-    await session.commit()
+   # await session.commit()
 
 
-
-
-
-
+@app.get("/profile_view", dependencies=[Depends(auth.get_token_from_request())]) #протектед роут
+def profile_view(token: RequestToken = Depends()):
+    try:
+        auth.verify_token(token=token)
+        return {"msg_access":True}
+    except:
+        raise HTTPException(401, detail="invalid credentials")
 
 
 
