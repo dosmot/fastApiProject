@@ -1,5 +1,5 @@
 from typing import Annotated
-from authx import AuthXConfig, AuthX, RequestToken
+from authx import AuthXConfig, AuthX, RequestToken, TokenPayload
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, Column,select
@@ -61,14 +61,19 @@ async def login(data: Users_Model,session : AsyncSession = Depends(get_db)): #р
     result = await session.execute(req)
     if result is not None:
         row = result.scalars().first()
-        token = auth.create_access_token(uid=str(row.id))
-        return {"id":row.id,"login":row.login,"token": token}
+        access_token = auth.create_access_token(uid=str(row.id),fresh=True)
+        refresh_token = auth.create_refresh_token(uid=str(row.id))
+        return {"id":row.id,"login":row.login,"access_token": access_token,"refresh_token":refresh_token}
     else:
         raise HTTPException(401, detail="invalid credentials")
    # await session.commit()
 
+@app.post("/refresh")
+def refresh(token: TokenPayload = Depends(auth.refresh_token_required)):
+    access_token = auth.create_access_token(token.sub)
+    return {"access_token": access_token}
 
-@app.get("/profile_view", dependencies=[Depends(auth.get_token_from_request())]) #протектед роут
+@app.get("/profile_view", dependencies=[Depends(auth.access_token_required)]) #протектед роут
 def profile_view(token: RequestToken = Depends()):
     try:
         auth.verify_token(token=token)
