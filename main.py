@@ -1,9 +1,10 @@
+from datetime import timedelta
 from typing import Annotated
 from passlib.context import CryptContext
 from authx import AuthXConfig, AuthX, RequestToken, TokenPayload
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column,select
+from sqlalchemy import create_engine, Column, select, ForeignKey, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 app = FastAPI()
@@ -11,7 +12,9 @@ app = FastAPI()
 config = AuthXConfig(
     JWT_ALGORITHM="HS256",
     JWT_SECRET_KEY="SecretKey",
-    JWT_TOKEN_LOCATION=['json']
+    JWT_TOKEN_LOCATION=['headers'],
+    JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=30),
+    JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=7)
 )
 auth = AuthX(config)
 auth.handle_errors(app)
@@ -42,8 +45,8 @@ class profiles_db(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str]
     password: Mapped[str]
-    account_id: Mapped[int] = mapped_column(foreign_key=accounts_db.id)
-
+   # account_id: Mapped[int] = mapped_column(foreign_key=accounts_db.id)
+    account_id = Column(Integer, ForeignKey('accounts.id'))
 class desc_profiles_db(Base):
     __tablename__ = 'desc_profiles'
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -51,7 +54,7 @@ class desc_profiles_db(Base):
     last_name: Mapped[str]
     birth_date: Mapped[str]
     avatar: Mapped[str]
-    profile_id: Mapped[int] = mapped_column(foreign_key=profiles_db.id)
+    profile_id = Column(Integer, ForeignKey('profiles.id'))
 #############################модели валидации###################################
 
 class Users_Model(BaseModel):
@@ -85,8 +88,8 @@ async def login(data: Users_Model,session : AsyncSession = Depends(get_db)): #р
    # req = select(accounts_db).where(accounts_db.login == data.login and accounts_db.password == data.password )
     req = select(accounts_db).where(accounts_db.login == data.login)
     result = await session.execute(req)
-    if result is not None:
-        row = result.scalars().first()
+    row = result.scalars().first()
+    if row is not None:
         pass_bool = verify_password(data.password, str(row.password))
         if pass_bool:
             access_token = auth.create_access_token(uid=str(row.id),fresh=True)
@@ -97,6 +100,9 @@ async def login(data: Users_Model,session : AsyncSession = Depends(get_db)): #р
     else:
         raise HTTPException(401, detail="invalid credentials")
    # await session.commit()
+@app.delete("/del_account")
+async def delete_account(user: dict = Depends(auth.get_current_subject), session: AsyncSession = Depends(get_db)):
+    res = await  session.execute()
 @app.post("/logout") #ДОБАВИТЬ ОТЗЫВ РЕФРЕШ ТОКЕНА
 def logout(token: RequestToken = Depends(auth.access_token_required)):
     token.revoke_token(token)
@@ -106,6 +112,8 @@ def refresh(token: TokenPayload = Depends(auth.refresh_token_required)):
     access_token = auth.create_access_token(token.sub)
     return {"access_token": access_token}
 #########################Необходимо разбирать на роуты#####################################
+
+
 @app.get("/profile_view", dependencies=[Depends(auth.get_token_from_request)]) #протектед роут
 def profile_view(token: RequestToken = Depends()):
     try:
