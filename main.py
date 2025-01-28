@@ -1,10 +1,11 @@
-from datetime import timedelta
+from datetime import timedelta, date
 from typing import Annotated
+import uvicorn
 from passlib.context import CryptContext
 from authx import AuthXConfig, AuthX, RequestToken, TokenPayload
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, select, ForeignKey, Integer
+from sqlalchemy import create_engine, Column, select, ForeignKey, Integer, Delete
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 app = FastAPI()
@@ -60,7 +61,14 @@ class desc_profiles_db(Base):
 class Users_Model(BaseModel):
     login: str = Field(min_length=6, max_length=30)
     password: str = Field(min_length=6, max_length=30)
-#class Profiles_Model(BaseModel):
+class Profiles_Model(BaseModel):
+    username: str = Field(min_length=6, max_length=30)
+    password: str = Field(min_length=6, max_length=30)
+class Profiles_desc(BaseModel):
+    first_name: str = Field(min_length=2, max_length=300)
+    last_name: str = Field(min_length=2, max_length=300)
+    birth_date: date
+    avatar: str
 
 @app.post('/create_db',tags=["База данных"])     #создание таблицы
 async def create_db():
@@ -100,9 +108,12 @@ async def login(data: Users_Model,session : AsyncSession = Depends(get_db)): #р
     else:
         raise HTTPException(401, detail="invalid credentials")
    # await session.commit()
-@app.delete("/del_account")
-async def delete_account(user: dict = Depends(auth.get_current_subject), session: AsyncSession = Depends(get_db)):
-    res = await  session.execute()
+@app.delete("/account/del_account")
+async def delete_account(user = Depends(auth.get_current_subject), session: AsyncSession = Depends(get_db)):
+    if not user.is_authenticated():
+        raise HTTPException(401, detail="Ошибка аутентификации")
+    res = await session.execute(Delete(accounts_db).where(accounts_db.id == user.id)   )
+    return res.scalars().first()
 @app.post("/logout") #ДОБАВИТЬ ОТЗЫВ РЕФРЕШ ТОКЕНА
 def logout(token: RequestToken = Depends(auth.access_token_required)):
     token.revoke_token(token)
@@ -112,6 +123,36 @@ def refresh(token: TokenPayload = Depends(auth.refresh_token_required)):
     access_token = auth.create_access_token(token.sub)
     return {"access_token": access_token}
 #########################Необходимо разбирать на роуты#####################################
+
+@app.post("/account/create_profile", dependencies=[Depends(auth.get_token_from_request)])
+async def create_profile(data: Profiles_Model, session: AsyncSession = Depends(get_db), token: RequestToken = Depends()):
+    try:
+        vt = auth.verify_token(token=token)
+        res = await session.execute(select(profiles_db).filter(profiles_db.username == data.username))
+        if res.scalars().first() is None:
+            hash_pass = get_password_hash(data.password)
+            session.add(profiles_db(username=data.username,password=hash_pass,account_id=vt.id))
+            await session.commit()
+            return {"create_profile": True}
+        else:
+            return {"create_profile":False}
+    except Exception as e:
+        return {"create_profile":False,"error":str(e)}
+
+@app.post("/account/create_profile", dependencies=[Depends(auth.get_token_from_request)])
+async def create_profile(data: Profiles_Model, session: AsyncSession = Depends(get_db), token: RequestToken = Depends()):
+    try:
+        vt = auth.verify_token(token=token)
+        res = await session.execute(select(profiles_db).filter(profiles_db.username == data.username))
+        if res.scalars().first() is None:
+            hash_pass = get_password_hash(data.password)
+            session.add(profiles_db(username=data.username,password=hash_pass,account_id=vt.id))
+            await session.commit()
+            return {"create_profile": True}
+        else:
+            return {"create_profile":False}
+    except Exception as e:
+        return {"create_profile":False,"error":str(e)}
 
 
 @app.get("/profile_view", dependencies=[Depends(auth.get_token_from_request)]) #протектед роут
@@ -127,3 +168,5 @@ def profile_view(token: RequestToken = Depends()):
 @app.get("/")
 def main():
     return "Hello World"
+#if __name__ == "__main__":
+ #   uvicorn.run("main:app", port=5000, log_level="info")
