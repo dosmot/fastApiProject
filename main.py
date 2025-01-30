@@ -139,20 +139,19 @@ async def create_profile(data: Profiles_Model, session: AsyncSession = Depends(g
     except Exception as e:
         return {"create_profile":False,"error":str(e)}
 
-@app.post("/account/create_profile", dependencies=[Depends(auth.get_token_from_request)])
-async def create_profile(data: Profiles_Model, session: AsyncSession = Depends(get_db), token: RequestToken = Depends()):
+
+@app.get("/account/get_profiles", dependencies=[Depends(auth.get_token_from_request)])
+async def get_profiles( session: AsyncSession = Depends(get_db), token: RequestToken = Depends()):
     try:
         vt = auth.verify_token(token=token)
-        res = await session.execute(select(profiles_db).filter(profiles_db.username == data.username))
+        res = await session.execute(select(profiles_db.id).filter(profiles_db.account_id == vt.id))
         if res.scalars().first() is None:
-            hash_pass = get_password_hash(data.password)
-            session.add(profiles_db(username=data.username,password=hash_pass,account_id=vt.id))
-            await session.commit()
-            return {"create_profile": True}
+            return {"Count_profiles": False}
         else:
-            return {"create_profile":False}
+            return res.scalars()
     except Exception as e:
-        return {"create_profile":False,"error":str(e)}
+        return {"Count_profiles":False,"error":str(e)}
+
 
 
 @app.get("/profile_view", dependencies=[Depends(auth.get_token_from_request)]) #протектед роут
