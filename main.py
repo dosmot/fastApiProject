@@ -1,11 +1,14 @@
+import shutil
 from datetime import timedelta, date
 from typing import Annotated
 import uvicorn
+import os
+from nanoid import generate
 from passlib.context import CryptContext
 from authx import AuthXConfig, AuthX, RequestToken, TokenPayload
-from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, select, ForeignKey, Integer, Delete
+from fastapi import FastAPI, Depends, HTTPException, UploadFile,File
+from pydantic import BaseModel, Field, FilePath
+from sqlalchemy import create_engine, Column, select, ForeignKey, Integer, Delete, LargeBinary,Date
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 app = FastAPI()
@@ -13,13 +16,18 @@ app = FastAPI()
 config = AuthXConfig(
     JWT_ALGORITHM="HS256",
     JWT_SECRET_KEY="SecretKey",
-    JWT_TOKEN_LOCATION=['headers'],
+    JWT_TOKEN_LOCATION=['json'],
     JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=30),
     JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=7)
 )
 auth = AuthX(config)
 auth.handle_errors(app)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
@@ -53,7 +61,7 @@ class desc_profiles_db(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     first_name: Mapped[str]
     last_name: Mapped[str]
-    birth_date: Mapped[str]
+    birth_date = Column(Date)
     avatar: Mapped[str]
     profile_id = Column(Integer, ForeignKey('profiles.id'))
 #############################модели валидации###################################
@@ -68,7 +76,7 @@ class Profiles_desc(BaseModel):
     first_name: str = Field(min_length=2, max_length=300)
     last_name: str = Field(min_length=2, max_length=300)
     birth_date: date
-    avatar: str
+    avatar: FilePath
 
 @app.post('/create_db',tags=["База данных"])     #создание таблицы
 async def create_db():
@@ -124,6 +132,9 @@ def refresh(token: TokenPayload = Depends(auth.refresh_token_required)):
     return {"access_token": access_token}
 #########################Необходимо разбирать на роуты#####################################
 
+
+
+#########################       ПРОФИЛИ    #####################################
 @app.post("/account/create_profile", dependencies=[Depends(auth.get_token_from_request)])
 async def create_profile(data: Profiles_Model, session: AsyncSession = Depends(get_db), token: RequestToken = Depends()):
     try:
@@ -152,7 +163,31 @@ async def get_profiles( session: AsyncSession = Depends(get_db), token: RequestT
     except Exception as e:
         return {"Count_profiles":False,"error":str(e)}
 
+@app.get("/account/profile/{profile_id}/desc_profile", dependencies=[Depends(auth.get_token_from_request)])
+async def get_profile(profile_id: str, session: AsyncSession = Depends(get_db), token: RequestToken = Depends()):
+    try:
+        vt = auth.verify_token(token=token)
+        res = await session.execute(select(desc_profiles_db).filter(desc_profiles_db.profile_id == int(profile_id)))
+        if res.scalars().first() is None:
+            return {"desc_profiles": False}
+        else:
+            return res.scalars()
+    except Exception as e:
+        return {"error":str(e)}
 
+
+@app.post("/account/profile/desc_profile_save", dependencies=[Depends(auth.get_token_from_request)], tags=["Работа с профилями"])
+async def save_profile(data: Profiles_desc, session: AsyncSession = Depends(get_db), token: RequestToken = Depends(), file: UploadFile = File(...)):
+    try:
+        vt = auth.verify_token(token=token)
+        new_name = generate(file.filename, 21)
+        file_path = os.path.join(UPLOAD_DIR, new_name)
+        with open(file_path,"wb") as buff:
+            shutil.copyfile(file.filename, file_path )
+        session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=file_path))
+        await session.commit()
+    except Exception as e:
+        return {"error":str(e)}
 
 @app.get("/profile_view", dependencies=[Depends(auth.get_token_from_request)]) #протектед роут
 def profile_view(token: RequestToken = Depends()):
