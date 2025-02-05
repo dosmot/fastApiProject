@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from authx import AuthXConfig, AuthX, RequestToken, TokenPayload
 from fastapi import FastAPI, Depends, HTTPException, UploadFile,File
 from pydantic import BaseModel, Field, FilePath
-from sqlalchemy import create_engine, Column, select, ForeignKey, Integer, Delete, LargeBinary,Date
+from sqlalchemy import create_engine, Column, select, ForeignKey, Integer, delete, LargeBinary,Date
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 app = FastAPI()
@@ -35,7 +35,7 @@ def get_password_hash(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 #############################база данных###################################
-engine = create_async_engine('postgresql+asyncpg://postgres:123@localhost/Project_test') #тип бд+движок://логин:пасс@host/db
+engine = create_async_engine('postgresql+asyncpg://jesus:kotakpass@84.19.3.28/fastapijesus') #тип бд+движок://логин:пасс@host/db
 new_session = async_sessionmaker(engine) # создание асинхсессии
 async def get_db():
     async with new_session() as session:
@@ -45,25 +45,30 @@ class Base(DeclarativeBase):
     pass
 class accounts_db(Base):
     __tablename__ = 'accounts' #название таблицы
+    __table_args__ = {'schema': 'kotakbus'}
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str]
     password: Mapped[str]
 
 class profiles_db(Base):
     __tablename__ = 'profiles'
+    __table_args__ = {'schema': 'kotakbus'}
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str]
     password: Mapped[str]
    # account_id: Mapped[int] = mapped_column(foreign_key=accounts_db.id)
-    account_id = Column(Integer, ForeignKey('accounts.id'))
+   #  account_id = Column(Integer, ForeignKey('accounts.id'))
+    account_id = Column(Integer)
 class desc_profiles_db(Base):
     __tablename__ = 'desc_profiles'
+    __table_args__ = {'schema': 'kotakbus'}
     id: Mapped[int] = mapped_column(primary_key=True)
     first_name: Mapped[str]
     last_name: Mapped[str]
     birth_date = Column(Date)
     avatar: Mapped[str]
-    profile_id = Column(Integer, ForeignKey('profiles.id'))
+    # profile_id = Column(Integer, ForeignKey('profiles.id'))
+    profile_id = Column(Integer)
 #############################модели валидации###################################
 
 class Users_Model(BaseModel):
@@ -80,9 +85,12 @@ class Profiles_desc(BaseModel):
 
 @app.post('/create_db',tags=["База данных"])     #создание таблицы
 async def create_db():
+    # try:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all) #по умолчанию create_all не создает существующие таблицы
     return {"ok": True}
+    # except Exception as e:
+    #    print( {"msg": str(e)})
 @app.post('/add_account',tags=["База данных"]) #создание аккаунта
 async def add_account(data: Users_Model, session: AsyncSession = Depends(get_db)):
     try:
@@ -116,12 +124,21 @@ async def login(data: Users_Model,session : AsyncSession = Depends(get_db)): #р
     else:
         raise HTTPException(401, detail="invalid credentials")
    # await session.commit()
-@app.delete("/account/del_account")
-async def delete_account(user = Depends(auth.get_current_subject), session: AsyncSession = Depends(get_db)):
-    if not user.is_authenticated():
-        raise HTTPException(401, detail="Ошибка аутентификации")
-    res = await session.execute(Delete(accounts_db).where(accounts_db.id == user.id)   )
-    return res.scalars().first()
+@app.post("/account/del_account")
+async def delete_account(
+                         session: AsyncSession = Depends(get_db)):
+    try:
+        # vt = auth.verify_token(token)
+        # session.
+        # session.delete(res)
+        # await session.commit()
+        # print(res)
+        return res
+    except Exception as e:
+        print(str(e))
+        return {"msg":False}
+
+
 @app.post("/logout") #ДОБАВИТЬ ОТЗЫВ РЕФРЕШ ТОКЕНА
 def logout(token: RequestToken = Depends(auth.access_token_required)):
     token.revoke_token(token)
