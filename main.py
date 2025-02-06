@@ -204,7 +204,6 @@ async def save_profile(data: Profiles_desc, session: AsyncSession = Depends(get_
         # await session.commit()
     except Exception as e:
         return {"error":str(e)}
-
 @app.get("/profile_view", dependencies=[Depends(authZ.get_token_from_request)]) #протектед роут
 def profile_view(token: RequestToken = Depends()):
     try:
