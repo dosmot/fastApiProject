@@ -1,11 +1,68 @@
-# Test your FastAPI endpoints
+### Basic authorization.
+GET https://examples.http-client.intellij.net/basic-auth/user/passwd
+Authorization: Basic user passwd
 
-GET http://127.0.0.1:8000/
-Accept: application/json
+### Basic authorization with variables.
+GET https://examples.http-client.intellij.net/basic-auth/user/passwd
+Authorization: Basic {{username}} {{password}}
 
-###
+### Digest authorization.
+GET https://examples.http-client.intellij.net/digest-auth/realm/user/passwd
+Authorization: Digest user passwd
 
-GET http://127.0.0.1:8000/hello/User
-Accept: application/json
+### Digest authorization with variables.
+GET https://examples.http-client.intellij.net/digest-auth/realm/user/passwd
+Authorization: Digest {{username}} {{password}}
+### Authorization by token, part 1. Retrieve and save token.
+POST http://localhost:8000/authorization
+Content-Type: application/json
 
-###
+{
+  "login": "string",
+  "password": "string"
+}
+### Authorization by token, part 1. Retrieve and save token.
+POST http://localhost:8000/refresh
+Content-Type: application/json
+
+{
+ "refresh_token" : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwianRpIjoiYTNiNjRmNTMtMjYwOC00ZmU0LTljZDEtNGM5NTU1MmZjMmIwIiwidHlwZSI6InJlZnJlc2giLCJjc3JmIjoiIiwiaWF0IjoxNzM4NzM5MTA2LCJleHAiOjE3MzkzNDM5MDYuMzYwMTE0fQ.jVCRg2U2mosuJ7MNY8_D-EjhrfBDHUI1FPRiP9QXiK4"
+}
+
+> {% client.global.set("auth_token", response.body.token); %}
+### Authorization by token, part 1. Retrieve and save token.
+DELETE http://localhost:8000/account/del_account
+Content-Type: application/json
+
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiOWRhZTNmMDUtN2I1Yi00MTVmLTgxYTgtOTdkMzZjODI4N2UyIiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM4ODM3MjA0LCJleHAiOjE3Mzg4MzkwMDQuMzc3MjM2fQ.ql7qShf7-7hvHPMpOfP2Q42GLUc-Kr_EC5NMe5qhjOo"
+}
+
+
+### Authorization by token, part 1. Retrieve and save token.
+POST http://localhost:8000/account/create_profile
+Content-Type: application/json
+
+{
+  "username": "string",
+  "password": "string",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiMGRjZjcwNjYtOTEzMS00YjEwLWE1OWYtZmM5MGY2MTY2NTg2IiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM4ODQyMzM2LCJleHAiOjE3Mzg4NDMyMzYuMTMyMTg1fQ.2A59gFpf7OpDqFgsvRD9d227-5foFUVFJE6vV5dFtyo"
+}
+
+### Authorization by token, part 1. Retrieve and save token.
+GET http://localhost:8000/account/get_profiles
+Content-Type: application/json
+
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiNDllZDY4MjQtNDZkOC00YTdiLTlhZmMtMzMxYjUwOWI1ZTEzIiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM4ODQ0NTY2LCJleHAiOjE3Mzg4NDU0NjYuMjA4NTIxfQ.pHQ5JYNLmu1TL3v8QPUFEbiZjQtomHFLEyOhSJ0SQBk"
+}
+
+
+
+
+### Authorization by token, part 2. Use token to authorize.
+GET https://examples.http-client.intellij.net/headers
+Authorization: Bearer {{auth_token}}
+
+### Also, check documentation for automatic OAuth2
+GET https://www.jetbrains.com/help/idea/oauth-2-0-authorization.html
