@@ -82,7 +82,7 @@ class Profiles_desc(BaseModel):
     first_name: str = Field(min_length=2, max_length=300)
     last_name: str = Field(min_length=2, max_length=300)
     birth_date: date
-    # avatar: FilePath
+    avatar: str
 
 @app.post('/create_db',tags=["База данных"])     #создание таблицы
 async def create_db():
@@ -192,17 +192,21 @@ async def get_profile(profile_id: str, session: AsyncSession = Depends(get_db), 
         return {"error":str(e)}
 
 
-@app.post("/account/profile/desc_profile_save", tags=["Работа с профилями"])
-async def save_profile(data: Profiles_desc, session: AsyncSession = Depends(get_db),
+@app.get("/account/profile/{profile_id}/desc_profile_save", tags=["Работа с профилями"])
+async def save_profile(profile_id : int,
+         data: Profiles_desc, session: AsyncSession = Depends(get_db),
+                         tk : TokenPayload  = Depends(authZ.access_token_required),
                        file: UploadFile = File(...)):
     try:
         new_name = generate(file.filename, 21)
         file_path = os.path.join(UPLOAD_DIR, new_name)
-        with open(file_path,"wb") as buff:
-            shutil.copyfile(file.filename, file_path )
-        # session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=file_path))
-        # await session.commit()
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f )
+        session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=file_path,profile_id=profile_id))
+        await session.commit()
+        return file_path
     except Exception as e:
+        print( traceback.format_exc())
         return {"error":str(e)}
 @app.get("/profile_view", dependencies=[Depends(authZ.get_token_from_request)]) #протектед роут
 def profile_view(token: RequestToken = Depends()):

@@ -58,11 +58,16 @@ Content-Type: application/json
 }
 
 
+### Authorization by token, part 1. Retrieve and save token.
+POST http://localhost:8000/account/profile/desc_profile_save
+Content-Type: application/json
 
+{
+  "first_name": "string",
+  "last_name": "string",
+  "birth_date": "2025-02-07",
+  "avatar": "/file.txt'",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiNTdiNDg0MDQtY2FmMS00OWM2LTllZDItYmQ5NWM1YjU3ODM5IiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM4OTE1Njg2LCJleHAiOjE3Mzg5MTY1ODYuMTMwODgzfQ._yjVyZll01E8c4SygYmM2byfETYDPFFZb3G-1UnCxLw"
 
-### Authorization by token, part 2. Use token to authorize.
-GET https://examples.http-client.intellij.net/headers
-Authorization: Bearer {{auth_token}}
+}
 
-### Also, check documentation for automatic OAuth2
-GET https://www.jetbrains.com/help/idea/oauth-2-0-authorization.html
