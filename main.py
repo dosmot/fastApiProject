@@ -1,6 +1,7 @@
 import shutil
 import traceback
 from datetime import timedelta, date
+from pathlib import Path
 from typing import Annotated
 import uvicorn
 import os
@@ -67,9 +68,17 @@ class desc_profiles_db(Base):
     first_name: Mapped[str]
     last_name: Mapped[str]
     birth_date = Column(Date)
-    avatar: Mapped[str]
+    avatar: Mapped[int]
     # profile_id = Column(Integer, ForeignKey('profiles.id'))
     profile_id = Column(Integer)
+
+class mm_storage_db(Base):
+    __tablename__ = 'mm_storage'
+    __table_args__ = {'schema': 'kotakbus'}
+    id: Mapped[int] = mapped_column(primary_key=True)
+    hash_name: Mapped[str]
+    type_file: Mapped[str]
+
 #############################модели валидации###################################
 
 class Users_Model(BaseModel):
@@ -192,19 +201,27 @@ async def get_profile(profile_id: str, session: AsyncSession = Depends(get_db), 
         return {"error":str(e)}
 
 
-@app.get("/account/profile/{profile_id}/desc_profile_save", tags=["Работа с профилями"])
+@app.post("/account/profile/{profile_id}/desc_profile_save", tags=["Работа с профилями"])
 async def save_profile(profile_id : int,
-         data: Profiles_desc, session: AsyncSession = Depends(get_db),
-                         tk : TokenPayload  = Depends(authZ.access_token_required),
-                       file: UploadFile = File(...)):
+                        data: Profiles_desc, session: AsyncSession = Depends(get_db),
+                        tk : TokenPayload  = Depends(authZ.access_token_required),
+                        file: UploadFile = File(...)):
     try:
-        new_name = generate(file.filename, 21)
-        file_path = os.path.join(UPLOAD_DIR, new_name)
-        with open(file_path, "wb") as f:
-            shutil.copyfileobj(file.file, f )
-        session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=file_path,profile_id=profile_id))
-        await session.commit()
-        return file_path
+        res = await session.execute(select(desc_profiles_db).filter(desc_profiles_db.profile_id == profile_id))
+        if res.scalars().first() is None:
+            new_name = generate(file.filename, 21)
+            file_path = os.path.join(UPLOAD_DIR, new_name)
+            with open(file_path, "wb") as f:
+                shutil.copyfileobj(file.file, f )
+            req = mm_storage_db(hash_name=new_name,type_file=Path(file.filename).suffix)
+            session.add(req) # надо вытащить текущий файл id
+            await session.commit()  #не уверен что коммит  не закрывает сессию
+            await session.refresh(req)
+            session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=req.id,profile_id=profile_id))
+            await session.commit()
+            return {"msg":True}
+        #else: добавить update
+
     except Exception as e:
         print( traceback.format_exc())
         return {"error":str(e)}
