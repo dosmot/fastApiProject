@@ -10,7 +10,7 @@ from passlib.context import CryptContext
 from authx import AuthXConfig, AuthX, RequestToken, TokenPayload
 from fastapi import FastAPI, Depends, HTTPException, UploadFile,File
 from pydantic import BaseModel, Field, FilePath
-from sqlalchemy import create_engine, Column, select, ForeignKey, Integer, delete, LargeBinary,Date
+from sqlalchemy import create_engine, Column, select, ForeignKey, Integer, delete, LargeBinary, Date, update
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 app = FastAPI()
@@ -187,40 +187,43 @@ async def get_profiles( session: AsyncSession = Depends(get_db), tk : TokenPaylo
         return prof
     except Exception as e:
         return {"Count_profiles":False,"error":str(e)}
-
-@app.get("/account/profile/{profile_id}/desc_profile", dependencies=[Depends(authZ.get_token_from_request)])
-async def get_profile(profile_id: str, session: AsyncSession = Depends(get_db), token: RequestToken = Depends()):
+async def get_one_desc_prof(wutfind, session: AsyncSession):
     try:
-        vt = authZ.verify_token(token=token)
-        res = await session.execute(select(desc_profiles_db).filter(desc_profiles_db.profile_id == int(profile_id)))
-        if res.scalars().first() is None:
-            return {"desc_profiles": False}
+        res = await session.execute(select(desc_profiles_db).filter(desc_profiles_db.profile_id == wutfind))
+        prof = res.mappings().all()
+        if not prof:
+            return {"msg":"none"}
         else:
-            return res.scalars()
+            return prof
     except Exception as e:
         return {"error":str(e)}
+@app.get("/account/profile/{profile_id}/desc_profile", dependencies=[Depends(authZ.access_token_required)])
+async def gpdesc(profile_id:int,session: AsyncSession = Depends(get_db)):
+   return await get_one_desc_prof(profile_id,session)
 
-
-@app.post("/account/profile/{profile_id}/desc_profile_save", tags=["Работа с профилями"])
+@app.get("/account/profile/{profile_id}/desc_profile_save", tags=["Работа с профилями"])
 async def save_profile(profile_id : int,
                         data: Profiles_desc, session: AsyncSession = Depends(get_db),
                         tk : TokenPayload  = Depends(authZ.access_token_required),
                         file: UploadFile = File(...)):
     try:
-        res = await session.execute(select(desc_profiles_db).filter(desc_profiles_db.profile_id == profile_id))
-        if res.scalars().first() is None:
+        result = await get_one_desc_prof(profile_id,session)
+        if not result:
             new_name = generate(file.filename, 21)
             file_path = os.path.join(UPLOAD_DIR, new_name)
             with open(file_path, "wb") as f:
                 shutil.copyfileobj(file.file, f )
             req = mm_storage_db(hash_name=new_name,type_file=Path(file.filename).suffix)
-            session.add(req) # надо вытащить текущий файл id
+            session.add(req)
             await session.commit()  #не уверен что коммит  не закрывает сессию
             await session.refresh(req)
             session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=req.id,profile_id=profile_id))
             await session.commit()
             return {"msg":True}
-        #else: добавить update
+        else:
+            req = update(desc_profiles_db).where(desc_profiles_db.id == profile_id).values(first_name = data.first_name,last_name = data.last_name,
+                                                                                           birth_date = data.birth_date,avatar = data.avatar)
+
 
     except Exception as e:
         print( traceback.format_exc())

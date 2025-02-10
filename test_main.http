@@ -70,4 +70,13 @@ Content-Type: application/json
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiNTdiNDg0MDQtY2FmMS00OWM2LTllZDItYmQ5NWM1YjU3ODM5IiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM4OTE1Njg2LCJleHAiOjE3Mzg5MTY1ODYuMTMwODgzfQ._yjVyZll01E8c4SygYmM2byfETYDPFFZb3G-1UnCxLw"
 
 }
+### Authorization by token, part 1. Retrieve and save token.
+GET http://localhost:8000/account/profile/1/desc_profile
+Content-Type: application/json
+
+{
+
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiZjJlNWU1MTMtYzMyZi00MmQxLTgzNWUtNzE5MGI5ZDUxOTlhIiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM5MTg5ODI5LCJleHAiOjE3MzkxOTA3MjkuNzk4Mjc4fQ.L8TX_q90bs6oJurx4nkS2F5c6iDJ0KBA6Y8y-lLYHVw"
+
+}
 
