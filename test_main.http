@@ -71,12 +71,12 @@ Content-Type: application/json
 
 }
 ### Authorization by token, part 1. Retrieve and save token.
-GET http://localhost:8000/account/profile/1/desc_profile
+PATCH http://localhost:8000/account/profile/1/desc_profile
 Content-Type: application/json
 
 {
 
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiZjJlNWU1MTMtYzMyZi00MmQxLTgzNWUtNzE5MGI5ZDUxOTlhIiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM5MTg5ODI5LCJleHAiOjE3MzkxOTA3MjkuNzk4Mjc4fQ.L8TX_q90bs6oJurx4nkS2F5c6iDJ0KBA6Y8y-lLYHVw"
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwianRpIjoiMDBiYzdhNDUtYmZhOC00ODVhLWJmNDgtZDUyODIyOWUwYjg0IiwidHlwZSI6ImFjY2VzcyIsImZyZXNoIjp0cnVlLCJjc3JmIjoiIiwiaWF0IjoxNzM5MjU5NzIzLCJleHAiOjE3MzkyNjA2MjMuNzY1MDUxfQ.LiuTJ8jTogDsubrAvPsHLQ60IQlX486Uyq-bBBFa-gg"
 
 }
 

@@ -2,7 +2,7 @@ import shutil
 import traceback
 from datetime import timedelta, date
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 import uvicorn
 import os
 from nanoid import generate
@@ -30,7 +30,26 @@ UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-
+#########################       сохранение пикчи   #####################################
+async def upload_pic(
+                        session: AsyncSession ,
+                        file: Optional[UploadFile]):
+    try:
+        if file is None:
+            return {"id":0,"name":"None","type":"None"}
+        else:
+            new_name = generate(size = 21)
+            file_path = os.path.join(UPLOAD_DIR, new_name)
+            with open(file_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+            req = mm_storage_db(hash_name=new_name, type_file=Path(file.filename).suffix)
+            session.add(req)
+            await session.commit()
+            await session.refresh(req)
+            return {"id":req.id,"name":new_name,"type":Path(file.filename).suffix}
+    except Exception as e:
+        return HTTPException(status_code=500, detail=str(e))
+#########################                          #####################################
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -40,9 +59,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 engine = create_async_engine('postgresql+asyncpg://jesus:kotakpass@84.19.3.28/fastapijesus') #тип бд+движок://логин:пасс@host/db
 new_session = async_sessionmaker(engine) # создание асинхсессии
 async def get_db():
-    async with new_session() as session:
-        yield session #ожидание выполнение сессии
 
+        async with new_session() as session:
+            try:
+                yield session #ожидание выполнение сессии
+            except:
+                await session.close()
 class Base(DeclarativeBase):
     pass
 class accounts_db(Base):
@@ -197,34 +219,26 @@ async def get_one_desc_prof(wutfind, session: AsyncSession):
             return prof
     except Exception as e:
         return {"error":str(e)}
-@app.get("/account/profile/{profile_id}/desc_profile", dependencies=[Depends(authZ.access_token_required)])
-async def gpdesc(profile_id:int,session: AsyncSession = Depends(get_db)):
-   return await get_one_desc_prof(profile_id,session)
 
-@app.get("/account/profile/{profile_id}/desc_profile_save", tags=["Работа с профилями"])
+@app.get("/account/profile/{profile_id}/desc_profile", dependencies = [Depends(authZ.access_token_required)])
+async def gp_desc(profile_id:int,session: AsyncSession = Depends(get_db)):
+    return await get_one_desc_prof(profile_id,session)
+
+
+@app.patch("/account/profile/{profile_id}/desc_profile_save", tags=["Работа с профилями"])
 async def save_profile(profile_id : int,
                         data: Profiles_desc, session: AsyncSession = Depends(get_db),
                         tk : TokenPayload  = Depends(authZ.access_token_required),
-                        file: UploadFile = File(...)):
+                        file: UploadFile = File):
     try:
         result = await get_one_desc_prof(profile_id,session)
+        dick_pic = await upload_pic(session, file)
         if not result:
-            new_name = generate(file.filename, 21)
-            file_path = os.path.join(UPLOAD_DIR, new_name)
-            with open(file_path, "wb") as f:
-                shutil.copyfileobj(file.file, f )
-            req = mm_storage_db(hash_name=new_name,type_file=Path(file.filename).suffix)
-            session.add(req)
-            await session.commit()  #не уверен что коммит  не закрывает сессию
-            await session.refresh(req)
-            session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=req.id,profile_id=profile_id))
-            await session.commit()
-            return {"msg":True}
+            session.add(desc_profiles_db(first_name = data.first_name,last_name=data.last_name,birth_date=data.birth_date,avatar=dick_pic.get("id"),profile_id=profile_id))
         else:
-            req = update(desc_profiles_db).where(desc_profiles_db.id == profile_id).values(first_name = data.first_name,last_name = data.last_name,
-                                                                                           birth_date = data.birth_date,avatar = data.avatar)
-
-
+            res = session.execute(update(desc_profiles_db).where(desc_profiles_db.id == profile_id).values(first_name = data.first_name,last_name = data.last_name))
+        # await session.commit()
+        return {"msg": True}
     except Exception as e:
         print( traceback.format_exc())
         return {"error":str(e)}
